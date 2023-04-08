@@ -82,7 +82,7 @@ public interface Mixin
      */
     default <S extends State> @NotNull S mixin(@NotNull Class<S> clzState)
         {
-        return mixin().of(clzState);
+        return mixin().get(clzState);
         }
 
     /**
@@ -111,7 +111,7 @@ public interface Mixin
          *                          implemented by the class on which it is invoked.
          */
         @SuppressWarnings("unchecked")
-        /*package*/ <S extends State> S of(@NotNull Class<S> clzState)
+        /*package*/ <S extends State> S get(@NotNull Class<S> clzState)
             {
             return (S) this;
             }
@@ -206,7 +206,7 @@ public interface Mixin
                             {
                             @Override
                             @SuppressWarnings("unchecked")
-                            protected <S extends State> S of(@NotNull Class<S> clzState)
+                            protected <S extends State> S get(@NotNull Class<S> clzState)
                                 {
                                 return (S) (clzState == class0 ? state0 : state1);
                                 }
@@ -226,7 +226,7 @@ public interface Mixin
                             {
                             @Override
                             @SuppressWarnings("unchecked")
-                            protected <S extends State> S of(@NotNull Class<S> clzState)
+                            protected <S extends State> S get(@NotNull Class<S> clzState)
                                 {
                                 // we capture the classNs rather than using stateN.getClass() to help avoid cache misses
                                 return (S) (clzState == class0 ? state0
@@ -254,7 +254,7 @@ public interface Mixin
                             {
                             @Override
                             @SuppressWarnings("unchecked")
-                            protected <S extends State> S of(@NotNull Class<S> clzState)
+                            protected <S extends State> S get(@NotNull Class<S> clzState)
                                 {
                                 // we capture the classNs rather than using stateN.getClass() to help avoid cache misses
                                 return (S) (clzState == class0 ? state0
@@ -288,7 +288,7 @@ public interface Mixin
                             {
                             @Override
                             @SuppressWarnings("unchecked")
-                            public <S extends State> S of(@NotNull Class<S> clzState)
+                            public <S extends State> S get(@NotNull Class<S> clzState)
                                 {
                                 return (S) states[indexMap.get(clzState)];
                                 }
