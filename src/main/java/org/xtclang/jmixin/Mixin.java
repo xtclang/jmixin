@@ -93,12 +93,12 @@ public interface Mixin
         /**
          * Allocate the {@link State} to be stored in a {@code protected final} field of a class which incorporates mixins.
          *
-         * @param mixin the object incorporating mixins
+         * @param mixed the object incorporating mixins
          * @return the {@link State}
          */
-        public static <M extends Mixin> @NotNull State of(M mixin)
+        public static @NotNull State of(Mixin mixed)
             {
-            return ALLOC.get(mixin.getClass()).get();
+            return ALLOC.get(mixed.getClass()).get();
             }
 
         /**
@@ -116,6 +116,11 @@ public interface Mixin
             return (S) this;
             }
 
+        /**
+         * A {@link ClassValue} keyed by the classes which incorporate {@link Mixin}s. The stored value is an "allocator"
+         * for the {@link State} implementation for that specific class. That {@link State} will contain the individual
+         * derived {@link State} objects for each of the incorporated {@link Mixin}s.
+         */
         private static final ClassValue<Supplier<State>> ALLOC = new ClassValue<>()
             {
             @Override
