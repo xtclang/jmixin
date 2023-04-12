@@ -53,7 +53,7 @@ public class MixinBenchmarks
         {
         default int first()
             {
-            return mixin(State.class).value;
+            return State.get(this, State.class).value;
             }
 
         class State extends Mixin.State
@@ -66,7 +66,7 @@ public class MixinBenchmarks
         {
         default long second()
             {
-            return mixin(State.class).value++;
+            return State.get(this, State.class).value++;
             }
 
         class State extends Mixin.State
@@ -79,7 +79,7 @@ public class MixinBenchmarks
         {
         default short third()
             {
-            return mixin(State.class).value++;
+            return State.get(this, State.class).value++;
             }
 
         class State extends Mixin.State
@@ -92,7 +92,7 @@ public class MixinBenchmarks
         {
         default byte fourth()
             {
-            return mixin(State.class).value++;
+            return State.get(this, State.class).value++;
             }
 
         class State extends Mixin.State
@@ -105,7 +105,7 @@ public class MixinBenchmarks
         {
         default char fifth()
             {
-            return mixin(State.class).value++;
+            return State.get(this, State.class).value++;
             }
 
         class State extends Mixin.State
@@ -118,7 +118,7 @@ public class MixinBenchmarks
         {
         default int sixth()
             {
-            return mixin(State.class).value++;
+            return State.get(this, State.class).value++;
             }
 
         class State extends Mixin.State
@@ -131,7 +131,7 @@ public class MixinBenchmarks
         {
         default int seventh()
             {
-            return mixin(State.class).value++;
+            return State.get(this, State.class).value++;
             }
 
         class State extends Mixin.State
@@ -144,7 +144,7 @@ public class MixinBenchmarks
         {
         default int eigth()
             {
-            return mixin(State.class).value++;
+            return State.get(this, State.class).value++;
             }
 
         class State extends Mixin.State
@@ -157,7 +157,7 @@ public class MixinBenchmarks
         {
         default int ninth()
             {
-            return mixin(State.class).value++;
+            return State.get(this, State.class).value++;
             }
 
         class State extends Mixin.State
