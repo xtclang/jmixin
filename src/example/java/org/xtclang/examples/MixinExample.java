@@ -1,16 +1,12 @@
 package org.xtclang.examples;
 
-import org.junit.jupiter.api.Test;
 import org.xtclang.jmixin.Mixin;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
- * WIP: Examples of {@link org.xtclang.jmixin.Mixin}.
+ * Examples of {@link org.xtclang.jmixin.Mixin}.
  *
  * @author falcom
  */
@@ -20,7 +16,7 @@ public class MixinExample
         {
         default long getId()
             {
-            return State.get(this, State.class).id;
+            return mixin(State.class).id;
             }
 
         final class State extends Mixin.State
@@ -30,149 +26,185 @@ public class MixinExample
             }
         }
 
-
-    interface Mammal
-        {
-        int getArmCount();
-        int getLegCount();
-        boolean hasTail();
-        }
-
-    interface Pet extends Mammal
-        {
-        String getBreed();
-        Human getOwner();
-        }
-
-    interface Named
-        {
-        String getName();
-        }
-
-    interface NamedMixin extends Named, Mixin
-        {
-        default String getName()
+    class Vehicle {
+        String make;
+        String model;
+        int seating;
+        public String getMake()
             {
-            return State.get(this).name;
+            return make;
             }
 
-        default void setName(String name)
+        public void setMake(String make)
             {
-            State.get(this).name = name;
+            this.make = make;
             }
 
-        class State extends Mixin.State
+        public String getModel()
             {
-            private static State get(NamedMixin mixin)
-                {
-                return get(mixin, State.class);
-                }
+            return model;
+            }
 
-            private String name;
+        public void setModel(String model)
+            {
+            this.model = model;
+            }
+        public int getSeating()
+            {
+            return seating;
+            }
+
+        public void setSeating(int seating)
+            {
+            this.seating = seating;
             }
         }
 
-    interface ParentMixin<C extends Named> extends Mixin
+    class Car extends Vehicle
         {
-        default C addChild(C child)
+        boolean frontWheelDrive;
+        boolean manualTransmission;
+        public boolean isFrontWheelDrive()
             {
-            State.get(this).childenByName.put(child.getName(), child);
-            return child;
+            return frontWheelDrive;
             }
 
-        default Collection<C> getChildren()
+        public void setFrontWheelDrive(boolean frontWheelDrive)
             {
-            return State.get(this).childenByName.values();
+            this.frontWheelDrive = frontWheelDrive;
+            }
+        public boolean isManualTransmission()
+            {
+            return manualTransmission;
             }
 
-        final class State<C extends Named> extends Mixin.State
+        public void setManualTransmission(boolean manualTransmission)
             {
-            private static <C extends Named> State<C> get(ParentMixin<C> target)
-                {
-                return get(target, State.class);
-                }
-
-            private final Map<String, C> childenByName = new HashMap<>();
+            this.manualTransmission = manualTransmission;
             }
         }
 
-    class Human extends Mixin.Base implements Mammal, NamedMixin, ParentMixin<Human>
+    abstract class Boat extends Vehicle
         {
-        @Override
-        public int getArmCount()
+        int displacement;
+        public int getDisplacement()
             {
-            return 2;
+            return displacement;
             }
 
-        @Override
-        public int getLegCount()
+        public void setDisplacement(int displacement)
             {
-            return 2;
-            }
-
-        @Override
-        public boolean hasTail()
-            {
-            return false;
-            }
-
-        @Override
-        public String toString()
-            {
-            return getName();
+            this.displacement = displacement;
             }
         }
 
-    class Catalog<T> extends Mixin.Base implements NamedMixin, ParentMixin<Catalog<T>>
+    interface VehicleMixin extends Mixin
         {
-        final T value;
-
-        Catalog(String name, T value)
+        default String getMake()
             {
-            this.value = value;
-            setName(name);
+            return mixin(State.class).make;
             }
-
-        Catalog(T value)
+    
+        default void setMake(String make)
             {
-            this.value = value;
-            setName(value.toString());
+            mixin(State.class).make = make;
             }
-
-        T getValue()
+    
+        default String getModel()
             {
-            return value;
+            return mixin(State.class).model;
+            }
+    
+        default void setModel(String model)
+            {
+            mixin(State.class).model = model;
+            }
+        default int getSeating()
+            {
+            return mixin(State.class).seating;
+            }
+    
+        default void setSeating(int seating)
+            {
+            mixin(State.class).seating = seating;
+            }
+        
+        final class State extends Mixin.State
+            {
+            String make;
+            String model;
+            int seating;
             }
         }
 
-    @Test
-    void test()
+    interface CarMixin extends VehicleMixin
         {
-        Human mark = new Human();
-        mark.setName("Mark");
-        Human erika = new Human();
-        erika.setName("Erika");
-        Human mia = new Human();
-        mia.setName("Mia");
+        default boolean isFrontWheelDrive()
+            {
+            return mixin(State.class).frontWheelDrive;
+            }
 
-        mark.addChild(erika);
-        mark.addChild(mia);
+        default void setFrontWheelDrive(boolean frontWheelDrive)
+            {
+            mixin(State.class).frontWheelDrive = frontWheelDrive;
+            }
+        default boolean isManualTransmission()
+            {
+            return mixin(State.class).manualTransmission;
+            }
 
-        System.out.println(mark.getChildren());
+        default void setManualTransmission(boolean manualTransmission)
+            {
+            mixin(State.class).manualTransmission = manualTransmission;
+            }
 
+        final class State extends Mixin.State
+            {
+            boolean frontWheelDrive;
+            boolean manualTransmission;
+            }
+        }
 
-        Catalog<String> computers = new Catalog<>("computers");
-        Catalog<String> laptops = computers.addChild(new Catalog<>("laptops"));
-        Catalog<String> desktops = computers.addChild(new Catalog<>("desktops"));
+    interface BoatMixin extends VehicleMixin
+        {
+        default int getDisplacement()
+            {
+            return mixin(State.class).displacement;
+            }
 
-        Catalog<String> kitt = laptops.addChild(new Catalog<>("kitt"));
-        kitt.addChild(new Catalog<>("cpu", "m2"));
-        kitt.addChild(new Catalog<>("color", "midnight"));
-        kitt.addChild(new Catalog<>("ram", "24g"));
+        default void setDisplacement(int displacement)
+            {
+            mixin(State.class).displacement = displacement;
+            }
 
-        Catalog<String> wopr = desktops.addChild(new Catalog<>("wopr"));
-        wopr.addChild(new Catalog<>("cpu", "i5"));
-        wopr.addChild(new Catalog<>("color", "silver"));
-        wopr.addChild(new Catalog<>("ram", "8g"));
+        final class State extends Mixin.State
+            {
+            int displacement;
+            }
+        }
+
+    class Beetle extends Mixin.Base implements CarMixin
+        {
+        public Beetle()
+            {
+            setMake("VW");
+            setModel("Beetle");
+            setSeating(4);
+            setFrontWheelDrive(true);
+            setManualTransmission(true);
+            }
+        }
+
+    class Schwimmwagen extends Mixin.Base implements CarMixin, BoatMixin
+        {
+        public Schwimmwagen()
+            {
+            setMake("VW");
+            setModel("Schwimmwagen");
+            setSeating(2);
+            setFrontWheelDrive(false);
+            setManualTransmission(true);
+            setDisplacement(1234);
+            }
         }
     }

@@ -13,29 +13,38 @@ import java.util.function.Supplier;
  * A base interface for building mixins, i.e. stateful interfaces.
  *
  * <p>For classes which wish to incorporate one or more mixins in addition to declaring that they {@code implement} the
- * mixin, they must also include a single {@code protected final} of type {@link Mixin.State} and expose it by implementing
- * the {@link #getMixinState()} method. Beyond that the class does not need to provide any implementation logic for the mixins
- * it incorporates. For example, assuming there is a mixin named {@code BirthdayMixin}, it can be incorporated as follows:
+ * mixin, they must also include a single field of type {@link Mixin.State} and expose it by implementing the
+ * {@link #mixin()} method (preferably marking both {@code final}). Beyond that the class does not need to provide any
+ * implementation logic for the mixins it incorporates. For example, assuming there is a mixin named {@code
+ * BirthdayMixin}, it can be incorporated as follows:
  *
  * <pre>{@code
  * class Person implements BirthdayMixin {
- *     protected final Mixin.State mixinState = Mixin.State.of(this);
- *     public final Mixin.State getMixinState() {
- *         return mixinState;
+ *     private final Mixin.State mixin = Mixin.State.of(this);
+ *     public final Mixin.State mixin() {
+ *         return mixin;
  *     }
  * }
  * }</pre>
  *
- * <p>If the class were to incorporate multiple mixins it would only need to add them to the {@code implements} clause.
+ * <p>Alternatively if the incorporating class has no base class it can extend {@link Mixin.Base} and simply inherit
+ * these boilerplate declarations:
  *
- * <p>Mixin interfaces consists of default methods and an inner {@code State} class which derives from {@link Mixin.State}.
- * The default methods access their state via {@link State#get(Mixin, Class)} method, simply passing in {@code this} and
- * their derived {@code State.class}.
+ * <pre>{@code
+ * class Person extends Mixin.Base implements BirthdayMixin {
+ * }
+ * }</pre>
+ *
+ * <p>In either case, incorporating additional mixins only requires adding them to the {@code implements} clause.
+ *
+ * <p>Mixin interfaces consist of {@code default} methods and an inner {@code State} class which derives from {@link
+ * Mixin.State}. These methods access their state via a parameterized {@link #mixin(Class) mixin(State.class)} method,
+ * simply passing their derived {@code State.class}.
  *
  * <pre>{@code
  * interface BirthdayMixin extends Mixin {
  *     default Date getBirthday() {
- *         return State.get(this, State.class).birthday;
+ *         return mixin(State.class).birthday;
  *     }
  *
  *     final class State extends Mixin.State {
@@ -44,27 +53,26 @@ import java.util.function.Supplier;
  * }
  * }</pre>
  *
- * <p>{@link Mixin}s and their {@link State}s can also have type parameters. In such cases it is helpful to overload the
- * static {@link State#get(Mixin, Class)} method as seen below in order to both simplify its usage and centralize the
- * unchecked warning stemming from the use of generics.
+ * <p>{@link Mixin}s may choose to define a {@code private} helper method to make their internal state access even easier.
+ * In addition to simplifying the usage, it also helps when writing mixins with type parameters.
  *
  * <pre>{@code
  * interface SomeGenericMixin<V> extends Mixin {
  *
  *     default V getValue() {
- *         return State.get(this).value;
+ *         return state().value;
  *     }
  *
  *     default void setValue(V value) {
- *         State.get(this).value = value;
+ *         state().value = value;
+ *     }
+ *
+ *     @SuppressWarnings("unchecked")
+ *     private State<V> state() {
+ *         return mixin(State.class);
  *     }
  *
  *     final class State<V> extends Mixin.State {
- *         @SuppressWarnings("unchecked")
- *         private static State<V> get(SomeMixin<V> target) {
- *             return get(target, State.class);
- *         }
- *
  *         private V value;
  *     }
  * }
@@ -72,8 +80,8 @@ import java.util.function.Supplier;
  *
  * <p>When authoring a mixin it is allowable to extend other mixins, but not advisable to extend their state class as that
  * recreates the classic "diamond problem" where multiple disjoint copies of the state would exist. Instead, the
- * inherited mixin's state may be accessed either through the interface methods, or via {@link State#get(Mixin, Class)
- * State.get(OtherMixin, OtherMixin.State.class)} assuming they've chosen not to make those fields {@code private}.
+ * inherited mixin's state may be accessed either through the interface methods, or via {@link #mixin(Class)} assuming
+ * they've chosen to not make those fields {@code private}.
  *
  * @author mf
  */
@@ -88,92 +96,76 @@ public interface Mixin
      * <p>This consists of the following:
      * <pre>{@code
      * class SomeClassIncorporatingMixins implements SomeMixin, MaybeSomeOtherMixin {
-     *     protected final Mixin.State mixinState = Mixin.State.of(this);
-     *     public Mixin.State mixinState() {
-     *         return mixinState;
+     *     protected final Mixin.State mixin = Mixin.State.of(this);
+     *     public Mixin.State mixin() {
+     *         return mixin;
      *     }
      * }
      * }</pre>
      *
      * @return the {@link Mixin.State}
      */
-    Mixin.State getMixinState();
+    Mixin.State mixin();
 
     /**
-     * Base class for mixin's to extend in order to declare their state.
+     * Return the {@link Mixin.State} for the given derived {@link Mixin.State} type.
+     *
+     * <p>This method is used internally be {@link Mixin}s in order to access their state.
+     *
+     * @param clzState the state to get
+     *
+     * @return the state
+     *
+     * @param <S> the derived state type
+     */
+    default <S extends Mixin.State> S mixin(Class<S> clzState)
+        {
+        return mixin().get(clzState);
+        }
+
+
+    /**
+     * An optional base class for classes which incorporate {@link Mixin}s.
+     *
+     * <p>Extending this class is optional and if using it as a base class is not possible then the implementing can
+     * simply implement the {@link #mixin()} method as described in its documentation.
+     */
+    abstract class Base
+            implements Mixin
+        {
+        /**
+         * The state for all incorporated {@link Mixin}s.
+         */
+        private final Mixin.State mixin = Mixin.State.of(this);
+
+        @Override
+        public final Mixin.State mixin()
+            {
+            return mixin;
+            }
+        }
+
+    /**
+     * Base class for a {@link Mixin}'s internal {@code State} implementations.
+     *
+     * <p>Each {@link Mixin} interface should declare an inner class which derives from {@link State}. This derived state
+     * can be accessed via {@link Mixin#mixin(Class)}, passing the derived {@code State.class}.
+     *
+     * <p>Typically the derived class will be {@code final} and its fields will be {@code private}. This ensures that
+     * the state cannot be derived (creating the diamond problem), and that it can only be accessed within the enclosing
+     * {@link Mixin} interface.
      */
     class State
         {
         /**
          * Allocate the {@link State} to be stored in a {@code protected final} field of a class which incorporates mixins.
          *
-         * @param mixed the object incorporating mixins
-         * @return the {@link State}
-         */
-        public static @NotNull State of(Mixin mixed)
-            {
-            return ALLOC.get(mixed.getClass()).get();
-            }
-
-        /**
-         * Return the {@link State} for the given {@link Class} for a {@link Mixin} object.
-         *
-         * <p>Note that derived {@link State} implementations can overload this static method to further simplify
-         * its usage.
-         *
-         * <pre>{@code
-         * interface SomeMixin extends Mixin {
-         *
-         *     default Value getValue() {
-         *         return State.get(this).value;
-         *     }
-         *
-         *     default void setValue(Value value) {
-         *         State.get(this).value = value;
-         *     }
-         *
-         *     final class State extends Mixin.State {
-         *         private static State get(SomeMixin target) {
-         *             return get(target, State.class);
-         *         }
-         *
-         *         private Value value;
-         *     }
-         * }
-         * }</pre>
-         *
-         * This type of overload also allows for generic {@link Mixin}s and {@link State}s.
-         *
-         * <pre>{@code
-         * interface SomeGenericMixin<V> extends Mixin {
-         *
-         *     default V getValue() {
-         *         return State.get(this).value;
-         *     }
-         *
-         *     default void setValue(V value) {
-         *         State.get(this).value = value;
-         *     }
-         *
-         *     final class State<V> extends Mixin.State {
-         *         @SuppressWarnings("unchecked")
-         *         private static State<V> get(SomeMixin<V> target) {
-         *             return get(target, State.class);
-         *         }
-         *
-         *         private V value;
-         *     }
-         * }
-         * }</pre>
-         *
          * @param target the object incorporating mixins
-         * @param clz the {@link State} type to get from {@code mixin}
          * @return the {@link State}
-         * @param <S> the derived {@link State} type
          */
-        public static <S extends State> @NotNull S get(@NotNull Mixin target, @NotNull Class<S> clz)
+        public static @NotNull State of(Mixin target)
             {
-            return target.getMixinState().get(clz);
+            return ALLOC.get(target.getClass()).get();
             }
 
         /**
@@ -398,24 +390,6 @@ public interface Mixin
                 }
 
             return ifacesOut;
-            }
-        }
-
-    /**
-     * A base class for classes which incorporate {@link Mixin}s.
-     *
-     * <p>Extending this class is optional and if using it as a base class is not possible then the implementing can
-     * simply implement the {@link #getMixinState()} method as described in its documentation.
-     */
-    class Base
-            implements Mixin
-        {
-        protected final Mixin.State mixinState = Mixin.State.of(this);
-
-        @Override
-        public final Mixin.State getMixinState()
-            {
-            return mixinState;
             }
         }
     }

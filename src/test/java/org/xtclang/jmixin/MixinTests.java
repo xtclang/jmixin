@@ -20,7 +20,7 @@ public class MixinTests
         {
         default long getIdentity()
             {
-            return State.get(this, State.class).id;
+            return mixin(State.class).id;
             }
 
         final class State extends Mixin.State
@@ -34,12 +34,12 @@ public class MixinTests
         {
         default String getName()
             {
-            return State.get(this, State.class).name;
+            return mixin(State.class).name;
             }
 
         default void setName(String name)
             {
-            State.get(this, State.class).name = name;
+            mixin(State.class).name = name;
             }
 
         final class State extends Mixin.State
@@ -52,7 +52,7 @@ public class MixinTests
         {
         default UUID getUUID()
             {
-            return State.get(this, State.class).uuid;
+            return mixin(State.class).uuid;
             }
 
         class State extends Mixin.State
@@ -63,8 +63,6 @@ public class MixinTests
 
     static class Example extends Mixin.Base implements LongIdentityMixin, NamedMixin, UuidAbleMixin
         {
-        protected final Mixin.State mixin = Mixin.State.of(this);
-
         Example(String name)
             {
             setName(name);
