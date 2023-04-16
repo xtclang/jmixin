@@ -2,7 +2,7 @@
 
 ## Introduction
 
-One of the problems with working in Ecstasy is that it becomes really annoying to move back to "lesser" languages ;). One such example is Ecstasy's support for mixins. 
+One of the problems with working in Ecstasy is that it becomes really annoying to move back to "lesser" languages ;). One Ecstasy feature I miss when working in Java is mixins. You don't need them often, but when you do mixins can be very very useful.
 
 In response this JMixin project was created to bring Ecstasy style mixins to Java. While not quite as capable as full-blown Ecstasy mixins, JMixins do get close enough to be quite useful.
 
