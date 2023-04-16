@@ -21,9 +21,7 @@ import java.util.function.Supplier;
  * <pre>{@code
  * class Person implements BirthdayMixin {
  *     private final Mixin.State mixin = Mixin.State.of(this);
- *     public final Mixin.State mixin() {
- *         return mixin;
- *     }
+ *     public final Mixin.State mixin() {return mixin;}
  * }
  * }</pre>
  *
@@ -97,9 +95,7 @@ public interface Mixin
      * <pre>{@code
      * class SomeClassIncorporatingMixins implements SomeMixin, MaybeSomeOtherMixin {
      *     protected final Mixin.State mixin = Mixin.State.of(this);
-     *     public Mixin.State mixin() {
-     *         return mixin;
-     *     }
+     *     public final Mixin.State mixin() {return mixin;}
      * }
      * }</pre>
      *
@@ -110,7 +106,8 @@ public interface Mixin
     /**
      * Return the {@link Mixin.State} for the given derived {@link Mixin.State} type.
      *
-     * <p>This method is used internally be {@link Mixin}s in order to access their state.
+     * <p>This method is used internally by {@link Mixin}s in order to access their state and does not need to be
+     * overridden.
      *
      * @param clzState the state to get
      *
@@ -163,7 +160,7 @@ public interface Mixin
          * @param target the object incorporating mixins
          * @return the {@link State}
          */
-        public static @NotNull State of(Mixin target)
+        public static @NotNull State of(@NotNull Mixin target)
             {
             return ALLOC.get(target.getClass()).get();
             }
