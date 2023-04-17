@@ -110,7 +110,7 @@ quackers.setDisplacement(1234);
 
 And of course `quackers` can be passed to methods which expect either a land or sea vehicle.
 
-So how did we pick up this shared state? As you probably noticed we actually did more than just declare that we `implement` some mixins, we also declared that we `extend` a special `Mixin.Base` class. `Mixin.Base` is what is managing the state for the various mixins. If your class already inherits from some other class you'll need to do a bit more work to enable mixins.
+So how did we pick up the state? As you probably noticed we actually did more than just declare that we `implement` some mixins, we also declared that we `extend` a special `Mixin.Base` class. `Mixin.Base` is what is managing the state for the various mixins. If your class already inherits from some other class you'll need to do a bit more work to enable mixins.
 
 ```
 class DuckBoat
@@ -131,7 +131,7 @@ As it turns out authoring a new mixin is similarly easy, and not much harder tha
 Let's start by writing our `Vehicle` mixin:
 
 ```
-interface Vehicle extneds Mixin
+interface Vehicle extends Mixin
     {
     default int getSeats()
         {
@@ -161,7 +161,7 @@ interface Vehicle extneds Mixin
     }
 ```
 
-We've defined `Vehicle` as an interface extending the `Mixin` interface and provided defaults for the method it declares.  In order to store and access tate for a `Vehicle` we use a `mixin(State.class)` prefix. This can be thought of as similar to `this` on a `class`'s method declaration. What `mixin(State.class)` does is find the `Vehicle.State` instance within a particular `Vehicle` instance. `Vechicle.State` is just a normal class which has our fields. You may notice that as compared to our original `class` based `Vehicle` the line count is nearly identical, we've just added the line `final class State extends Mixin.State` and its `{}`. Other than that the transformation consisted of replacing `public` with `default` and `this` with `mixin(State.class).`
+We've defined `Vehicle` as an interface extending the `Mixin` interface and provided defaults for the method it declares.  In order to store and access state for a `Vehicle` we use a `mixin(State.class)` prefix. This can be thought of as similar to `this` on a `class`'s method declaration. What `mixin(State.class)` does is find the `Vehicle.State` instance within a particular `Vehicle` instance. `Vechicle.State` is just a normal class which has our fields. You may notice that as compared to our original `class` based `Vehicle` the line count is nearly identical, we've just added the line `final class State extends Mixin.State` and its `{}`. Other than that the transformation consisted of replacing `public` with `default` and `this` with `mixin(State.class).`
 
 Note that with this pattern we mark our inner `State` class as `final`. This `final` ensures that we don't recreate the "diamond problem" when one mixin extends another (more below).
 
@@ -260,7 +260,7 @@ interface LandVehicle extends Vehicle
 
 Note we've made `LandVehicle` extend `Vehicle` and thus inherited all of its behavior, but `LandVehicle.State` has no relationship to `Vehicle.State`. When a `DuckBoat` is instantiated it will have exactly one copy of each inner `State` object, and when `LandVechile` asks for its `State` it will receive the `LandVehicle.State` while `Vehicle`'s methods will receive `Vehicle.State`. `LandVehicle` can call the `public` methods it inherited from `Vehicle` to interact with its state as needed. If we wanted deeper integration we could put these two mixins in the same package, and make the fields package private, thus allowing `LandVehicle`'s methods to directly access `Vehicle`'s state via `mixin(Vehicle.State.class)`. 
 
-That's really all there is to it. From the user's perspective using a `DuckBoat` is no different than using any other object, there is no reason for them to even be aware that it is mixin based. For the `DuckBoat` author incorporating mixins was trivial requiring at most a few lines of boilerplate, and for the mixin author, writing a mixin required a few simple transformations as compared to having written it as a `class.
+That's really all there is to it. From the user's perspective using a `DuckBoat` is no different than using any other object, there is no reason for them to even be aware that it is mixin based. For the `DuckBoat` author incorporating mixins was trivial requiring at most a few lines of boilerplate, and for the mixin author, writing a mixin required a few simple transformations as compared to having written it as a `class`.
 
 ## Mixin Mechanics
 
