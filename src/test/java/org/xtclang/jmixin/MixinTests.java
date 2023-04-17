@@ -42,14 +42,19 @@ public class MixinTests
             return mixin(State.class).name;
             }
 
-        default void setName(String name)
-            {
-            mixin(State.class).name = name;
-            }
-
         final class State extends Mixin.State
             {
-            private String name;
+            public State(String name)
+                {
+                this.name = name;
+                }
+
+            public State()
+                {
+                this.name = null;
+                }
+
+            private final String name;
             }
         }
 
@@ -70,7 +75,7 @@ public class MixinTests
         {
         Example(String name)
             {
-            setName(name);
+            mixin(new NamedMixin.State(name));
             }
         }
 

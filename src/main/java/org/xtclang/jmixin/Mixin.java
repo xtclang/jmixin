@@ -2,6 +2,8 @@ package org.xtclang.jmixin;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -81,6 +83,50 @@ import java.util.function.Supplier;
  * inherited mixin's state may be accessed either through the interface methods, or via {@link #mixin(Class)} assuming
  * they've chosen to not make those fields {@code private}.
  *
+ * <p>A mixin's inner {@link State} is allowed to have a parameterized constructor, but if it does then any incorporating
+ * class will need to do a bit more work to call it. Let's revise our {@code BirthdayMixin} such that the birthday can
+ * be supplied via a parameterized constructor.
+ *
+ * <pre>{@code
+ * interface BirthdayMixin extends Mixin {
+ *     default Date getBirthday() {
+ *         return mixin(State.class).birthday;
+ *     }
+ *
+ *     final class State extends Mixin.State {
+ *         private final Date birthday;
+ *
+ *         public State(Date birthday) {
+ *             this.birthday = birthday;
+ *         }
+ *
+ *         public State() {
+ *             this(new Date());
+ *         }
+ *     }
+ * }
+ * }</pre>
+ *
+ * This new {@code BirthdayMixin} works the same as before and our {@code Person} class doesn't <em>require</em> any
+ * changes. But if {@code Person} wants to override the default {@code birthday} then it would need to be updated as
+ * follows:
+ *
+ * <pre>{@code
+ * class Person extends Mixin.Base implements BirthdayMixin {
+ *     public Person(Date birthday) {
+ *         mixin(new BirthdayMixin.State(birthday));
+ *     }
+ * }
+ * }</pre>
+ *
+ * Note that mixing in the {@code State} in this form should be done as part of construction, and can only be done once
+ * per {@link Mixin.State} type (i.e. you can't have two birthdays), and can only be done for {@link Mixin.State}s which
+ * were declared as having been incorporated (via the {@code implements} clause). If a method on that mixin is invoked
+ * before its state has been specified a state will be lazily incorporated via the state's {@code public} zero-argument
+ * constructor, if available, otherwise a {@code null} state and {@code NullPointerException} will result. For these
+ * reasons it is good practice to include a default {@code public} zero-argument constructor when possible, and to
+ * incorporate via a parameterized constructor within the incorporating class's constructor.
+ *
  * @author mf
  */
 public interface Mixin
@@ -120,6 +166,18 @@ public interface Mixin
         return mixin().get(clzState);
         }
 
+    /**
+     * Initialize an incorporating object with specific {@link Mixin.State} instance. This is needed when the
+     * {@link Mixin.State}s have parameter based constructors. This method if called but be invoked as part of the
+     * construction of the incorporating object. It may be called multiple times across the incorporating object's
+     * initialization hierarchy, but can only be called once with each {@link Mixin.State}.
+     *
+     * @param state the state
+     */
+    default void mixin(Mixin.State state)
+        {
+        mixin().mixin(state);
+        }
 
     /**
      * An optional base class for classes which incorporate {@link Mixin}s.
@@ -155,6 +213,11 @@ public interface Mixin
     class State
         {
         /**
+         * {@link VarHandle} for working with an array of {@link State}s.
+         */
+        private static final VarHandle STATES = MethodHandles.arrayElementVarHandle(State[].class);
+
+        /**
          * Allocate the {@link State} to be stored in a {@code protected final} field of a class which incorporates mixins.
          *
          * @param target the object incorporating mixins
@@ -181,15 +244,37 @@ public interface Mixin
             }
 
         /**
+         * Late mixin a state object
+         *
+         * @param state the state to mix-in
+         */
+        /*package*/ void mixin(@NotNull State state)
+            {
+            throw new UnsupportedOperationException();
+            }
+
+        /**
          * A {@link ClassValue} keyed by the classes which incorporate {@link Mixin}s. The stored value is an "allocator"
          * for the {@link State} implementation for that specific class. That {@link State} will contain the individual
          * derived {@link State} objects for each of the incorporated {@link Mixin}s.
          */
         private static final ClassValue<Supplier<State>> ALLOC = new ClassValue<>()
             {
+            private interface Deferred extends Supplier<State>
+                {
+                @Override
+                default State get()
+                    {
+                    return null;
+                    }
+
+                State ensure();
+                }
+
             @Override
             protected Supplier<State> computeValue(Class<?> clz)
                 {
+                boolean deferred = false;
                 IdentityHashMap<Class<State>, Supplier<State>> allocMap = new IdentityHashMap<>();
                 for (Class<Mixin> mixin : getMixins(clz, new HashSet<>()))
                     {
@@ -198,26 +283,34 @@ public interface Mixin
                         {
                         if (clzInner != State.class && State.class.isAssignableFrom(clzInner))
                             {
+                            @SuppressWarnings("unchecked")
+                            Class<State> clzState = (Class<State>) clzInner;
                             try
                                 {
-                                @SuppressWarnings("unchecked")
-                                Class<State> clzState = (Class<State>) clzInner;
-                                Constructor<State> ctor = clzState.getConstructor();
-                                allocMap.put(clzState, () ->
+                                Constructor<?>[] ctors = clzState.getConstructors();
+                                Constructor<State> ctorZero = clzState.getConstructor();
+                                Supplier<State> sup = () ->
                                     {
                                     try
                                         {
-                                        return ctor.newInstance();
+                                        return ctorZero.newInstance();
                                         }
                                     catch (Exception e)
                                         {
                                         throw new RuntimeException(e);
                                         }
-                                    });
+                                    };
+
+
+                                deferred |= ctors.length > 1;
+                                allocMap.put(clzState, ctors.length > 1
+                                 ? ((Deferred) sup::get) : sup);
                                 }
                             catch (NoSuchMethodException e)
                                 {
-                                throw new RuntimeException(e);
+                                deferred = true;
+                                // no zero param constructor
+                                allocMap.put(clzState, () -> null); // deferred, incorporator will need to use mixin(new State(...))
                                 }
                             }
                         }
@@ -253,8 +346,80 @@ public interface Mixin
                 // if the number of mixins is small (up to 8) then we build an allocator which will
                 // find the child mixin via a linear scan; otherwise we use a full on map; for small
                 // sets the linear scan is both faster and more memory efficient than the map
+
                 int cAllocs = stateAllocs.size();
-                if (cAllocs == 0)
+                if (deferred)
+                    {
+                    return () ->
+                        {
+                        // allocated outside of State inner class to avoid it capturing stateAllocs/cAllocs
+                        State[] states = new State[cAllocs];
+                        for (var alloc : stateAllocs)
+                            {
+                            State s = alloc.get();
+                            if (s != null)
+                                {
+                                states[indexMap.get(s.getClass())] = s;
+                                }
+                            }
+
+                        return new State()
+                            {
+                            @Override
+                            @SuppressWarnings("unchecked")
+                            public <S extends State> S get(@NotNull Class<S> clzState)
+                                {
+                                int index = indexMap.get(clzState);
+                                S state = (S) STATES.getVolatile(states, index);
+                                return state == null ? ensure(index) : state;
+                                }
+
+                            /**
+                             * Lazy allocate the state.
+                             *
+                             * @param index the state index
+                             * @return the state
+                             * @param <S> the state type
+                             */
+                            @SuppressWarnings("unchecked")
+                            private <S extends State> S ensure(int index)
+                                {
+                                S state = null;
+                                Supplier<State> alloc = stateAllocs.get(index);
+                                if (alloc instanceof Deferred)
+                                    {
+                                    synchronized (this)
+                                        {
+                                        state = (S) STATES.getVolatile(states, index);
+                                        if (state == null)
+                                            {
+                                            state = (S) ((Deferred) alloc).ensure();
+                                            STATES.setVolatile(states, index, state);
+                                            }
+                                        }
+                                    }
+
+                                return state;
+                                }
+
+                            @Override
+                            void mixin(@NotNull State state)
+                                {
+                                Integer index = indexMap.get(state.getClass());
+                                if (index == null)
+                                    {
+                                    throw new IllegalArgumentException("not a mixed in type: " + state.getClass());
+                                    }
+
+                                if (!STATES.compareAndSet(states, index, null, state))
+                                    {
+                                    throw new IllegalArgumentException("state already supplied: " + state.getClass());
+                                    }
+                                }
+                            };
+                        };
+                    }
+                else if (cAllocs == 0)
                     {
                     // odd case that a class implements Mixin but doesn't incorporate any Mixins (not an error)
                     return State::new;
