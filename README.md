@@ -260,7 +260,7 @@ interface LandVehicle extends Vehicle
 
 Note we've made `LandVehicle` extend `Vehicle` and thus inherited all of its behavior, but `LandVehicle.State` has no relationship to `Vehicle.State`. When a `DuckBoat` is instantiated it will have exactly one copy of each inner `State` object, and when `LandVechile` asks for its `State` it will receive the `LandVehicle.State` while `Vehicle`'s methods will receive `Vehicle.State`. `LandVehicle` can call the `public` methods it inherited from `Vehicle` to interact with its state as needed. If we wanted deeper integration we could put these two mixins in the same package, and make the fields package private, thus allowing `LandVehicle`'s methods to directly access `Vehicle`'s state via `mixin(Vehicle.State.class)`. 
 
-That's really all there is to it. From the user's perspective using a `DuckBoat` is no different than using any other object, there is no reason for them to even be aware that it is mixin based. For the `DuckBoat` author incorporating mixins was trivial requiring at most a few lines of boilerplate, and for the mixin author, writing a mixin required a few simple transformations as compared to having written it as a `class.
+That's really all there is to it. From the user's perspective using a `DuckBoat` is no different than using any other object, there is no reason for them to even be aware that it is mixin based. For the `DuckBoat` author incorporating mixins was trivial requiring at most a few lines of boilerplate, and for the mixin author, writing a mixin required a few simple transformations as compared to having written it as a `class`.
 
 ## Mixin Mechanics
 
