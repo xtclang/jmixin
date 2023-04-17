@@ -110,7 +110,7 @@ quackers.setDisplacement(1234);
 
 And of course `quackers` can be passed to methods which expect either a land or sea vehicle.
 
-So how did we pick up this shared state? As you probably noticed we actually did more than just declare that we `implement` some mixins, we also declared that we `extend` a special `Mixin.Base` class. `Mixin.Base` is what is managing the state for the various mixins. If your class already inherits from some other class you'll need to do a bit more work to enable mixins.
+So how did we pick up the state? As you probably noticed we actually did more than just declare that we `implement` some mixins, we also declared that we `extend` a special `Mixin.Base` class. `Mixin.Base` is what is managing the state for the various mixins. If your class already inherits from some other class you'll need to do a bit more work to enable mixins.
 
 ```
 class DuckBoat
@@ -131,7 +131,7 @@ As it turns out authoring a new mixin is similarly easy, and not much harder tha
 Let's start by writing our `Vehicle` mixin:
 
 ```
-interface Vehicle extneds Mixin
+interface Vehicle extends Mixin
     {
     default int getSeats()
         {
@@ -161,7 +161,7 @@ interface Vehicle extneds Mixin
     }
 ```
 
-We've defined `Vehicle` as an interface extending the `Mixin` interface and provided defaults for the method it declares.  In order to store and access tate for a `Vehicle` we use a `mixin(State.class)` prefix. This can be thought of as similar to `this` on a `class`'s method declaration. What `mixin(State.class)` does is find the `Vehicle.State` instance within a particular `Vehicle` instance. `Vechicle.State` is just a normal class which has our fields. You may notice that as compared to our original `class` based `Vehicle` the line count is nearly identical, we've just added the line `final class State extends Mixin.State` and its `{}`. Other than that the transformation consisted of replacing `public` with `default` and `this` with `mixin(State.class).`
+We've defined `Vehicle` as an interface extending the `Mixin` interface and provided defaults for the method it declares.  In order to store and access state for a `Vehicle` we use a `mixin(State.class)` prefix. This can be thought of as similar to `this` on a `class`'s method declaration. What `mixin(State.class)` does is find the `Vehicle.State` instance within a particular `Vehicle` instance. `Vechicle.State` is just a normal class which has our fields. You may notice that as compared to our original `class` based `Vehicle` the line count is nearly identical, we've just added the line `final class State extends Mixin.State` and its `{}`. Other than that the transformation consisted of replacing `public` with `default` and `this` with `mixin(State.class).`
 
 Note that with this pattern we mark our inner `State` class as `final`. This `final` ensures that we don't recreate the "diamond problem" when one mixin extends another (more below).
 
