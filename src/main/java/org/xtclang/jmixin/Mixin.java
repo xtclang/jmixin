@@ -371,7 +371,7 @@ public interface Mixin
                                 {
                                 int index = indexMap.get(clzState);
                                 S state = (S) STATES.getVolatile(states, index);
-                                return state == null ? ensure(index) : state;
+                                return state == null || state == this ? ensure(index) : state;
                                 }
 
                             /**
@@ -384,22 +384,30 @@ public interface Mixin
                             @SuppressWarnings("unchecked")
                             private <S extends State> S ensure(int index)
                                 {
-                                S state = null;
                                 Supplier<State> alloc = stateAllocs.get(index);
                                 if (alloc instanceof Deferred)
                                     {
+                                    // don't allow concurrent ensures to race
                                     synchronized (this)
                                         {
-                                        state = (S) STATES.getVolatile(states, index);
-                                        if (state == null)
+                                        S state = (S) STATES.getVolatile(states, index);
+                                        if (state == null || state == this)
                                             {
-                                            state = (S) ((Deferred) alloc).ensure();
-                                            STATES.setVolatile(states, index, state);
+                                            // prevent a concurrent mixin(State) from winning a race; we want to ensure
+                                            // that every automatic alloc is retained in case they had any side effects
+                                            state = (S) STATES.compareAndExchange(states, index, state, this);
+                                            if (state == null || state == this)
+                                                {
+                                                state = (S) ((Deferred) alloc).ensure();
+                                                STATES.setVolatile(states, index, state);
+                                                }
                                             }
+                                        return state;
                                         }
                                     }
+                                // else; not able to alloc
 
-                                return state;
+                                return null;
                                 }
 
                             @Override
@@ -411,6 +419,7 @@ public interface Mixin
                                     throw new IllegalArgumentException("not a mixed in type: " + state.getClass());
                                     }
 
+                                // avoid sync and inflating the monitor on this common path
                                 if (!STATES.compareAndSet(states, index, null, state))
                                     {
                                     throw new IllegalArgumentException("state already supplied: " + state.getClass());
