@@ -19,16 +19,17 @@ import java.util.concurrent.TimeUnit;
  *
  * <pre>
  * Benchmark                     Mode  Cnt  Score   Error  Units
- * MixinBenchmarks.testBaseline  avgt    6  1.467 ± 0.014  ns/op
- * MixinBenchmarks.testMixin1    avgt    6  1.637 ± 0.023  ns/op
- * MixinBenchmarks.testMixin2    avgt    6  1.885 ± 0.031  ns/op
- * MixinBenchmarks.testMixin3    avgt    6  2.268 ± 0.093  ns/op
- * MixinBenchmarks.testMixin4    avgt    6  2.336 ± 0.079  ns/op
- * MixinBenchmarks.testMixin5    avgt    6  2.349 ± 0.139  ns/op
- * MixinBenchmarks.testMixin6    avgt    6  2.537 ± 0.032  ns/op
- * MixinBenchmarks.testMixin7    avgt    6  2.493 ± 0.149  ns/op
- * MixinBenchmarks.testMixin8    avgt    6  2.636 ± 0.023  ns/op
- * MixinBenchmarks.testMixin9    avgt    6  4.898 ± 0.675  ns/op
+ * MixinBenchmarks.testBaseline  avgt    6  1.723 ± 0.081  ns/op
+ * MixinBenchmarks.testLazy      avgt    6  2.545 ± 0.009  ns/op
+ * MixinBenchmarks.testMixin1    avgt    6  1.663 ± 0.053  ns/op
+ * MixinBenchmarks.testMixin2    avgt    6  1.925 ± 0.212  ns/op
+ * MixinBenchmarks.testMixin3    avgt    6  2.284 ± 0.251  ns/op
+ * MixinBenchmarks.testMixin4    avgt    6  2.516 ± 0.051  ns/op
+ * MixinBenchmarks.testMixin5    avgt    6  2.574 ± 0.512  ns/op
+ * MixinBenchmarks.testMixin6    avgt    6  2.900 ± 0.232  ns/op
+ * MixinBenchmarks.testMixin7    avgt    6  2.667 ± 0.311  ns/op
+ * MixinBenchmarks.testMixin8    avgt    6  2.697 ± 0.063  ns/op
+ * MixinBenchmarks.testMixin9    avgt    6  4.283 ± 0.029  ns/op
  * </pre>
  *
  * @author mf
@@ -140,7 +141,7 @@ public class MixinBenchmarks
             }
         }
 
-    interface EigthMixin extends Mixin
+    interface EighthMixin extends Mixin
         {
         default int eigth()
             {
@@ -166,6 +167,27 @@ public class MixinBenchmarks
             }
         }
 
+    interface LazyMixin extends Mixin
+        {
+        default int lazy()
+            {
+            return mixin(State.class).value++;
+            }
+
+        class State extends Mixin.State
+            {
+            public State(int value)
+                {
+                this.value = value;
+                }
+            
+            public State()
+                {
+                this(ThreadLocalRandom.current().nextInt());
+                }
+            private int value;
+            }
+        }
 
     static class Mixin1 extends Mixin.Base implements FirstMixin
         {
@@ -195,11 +217,15 @@ public class MixinBenchmarks
         {
         }
 
-    static class Mixin8 extends Mixin.Base implements FirstMixin, SecondMixin, ThirdMixin, FourthMixin, FifthMixin, SixthMixin, SeventhMixin, EigthMixin
+    static class Mixin8 extends Mixin.Base implements FirstMixin, SecondMixin, ThirdMixin, FourthMixin, FifthMixin, SixthMixin, SeventhMixin, EighthMixin
         {
         }
 
-    static class Mixin9 extends Mixin.Base implements FirstMixin, SecondMixin, ThirdMixin, FourthMixin, FifthMixin, SixthMixin, SeventhMixin, EigthMixin, NinthMixin
+    static class Mixin9 extends Mixin.Base implements FirstMixin, SecondMixin, ThirdMixin, FourthMixin, FifthMixin, SixthMixin, SeventhMixin, EighthMixin, NinthMixin
+        {
+        }
+
+    static class Lazy extends Mixin.Base implements LazyMixin
         {
         }
 
@@ -212,6 +238,7 @@ public class MixinBenchmarks
     static final Mixin7 mixin7 = new Mixin7();
     static final Mixin8 mixin8 = new Mixin8();
     static final Mixin9 mixin9 = new Mixin9();
+    static final Lazy lazy = new Lazy();
 
     @Benchmark
     @OperationsPerInvocation(LIMIT)
@@ -245,9 +272,6 @@ public class MixinBenchmarks
                     break;
                 case 7:
                     c += 324;
-                    break;
-                case 8:
-                    c += 242;
                     break;
                 default:
                     c += 88;
@@ -635,6 +659,48 @@ public class MixinBenchmarks
                     break;
                 default:
                     c += mixin9.ninth();
+                    break;
+                }
+            }
+
+        return c;
+        }
+
+    @Benchmark
+    @OperationsPerInvocation(LIMIT)
+    public long testLazy()
+        {
+        long c = 0;
+        for (int i = 0; i < LIMIT; ++i)
+            {
+            switch (next())
+                {
+                case 0:
+                    c += lazy.lazy() + 42;
+                    break;
+                case 1:
+                    c += lazy.lazy() + 33;
+                    break;
+                case 2:
+                    c += lazy.lazy() + 21;
+                    break;
+                case 3:
+                    c += lazy.lazy() + 12;
+                    break;
+                case 4:
+                    c += lazy.lazy() + 88;
+                    break;
+                case 5:
+                    c += lazy.lazy() + 93;
+                    break;
+                case 6:
+                    c += lazy.lazy() + 74;
+                    break;
+                case 7:
+                    c += lazy.lazy() + 92;
+                    break;
+                default:
+                    c += lazy.lazy() + 123;
                     break;
                 }
             }
