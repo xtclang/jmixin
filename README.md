@@ -120,7 +120,27 @@ class DuckBoat
     public final Mixin.State mixin() {return mixin;}
     }
 ```
-That's all that is required, and now `DuckBoat` can incorporate as many mixins as it likes without needing to write any additional boilerplate code. Any class extending `DuckBoat` can add further incorporations without writing any boilerplate of their own. What we see above is the literal implementation of `Mixin.Base`. By the way the `mixin()` method is declared on the `Mixin` interface, so here we're just providing the implementaiton, and if we forget to the compiler will complain. Also note that we made our implementation `final` so that any class which extends `DuckBoat` won't accidently repeat our work and define needless additional copies of the state.
+That's all that is required, and now `DuckBoat` can incorporate as many mixins as it likes without needing to write any additional boilerplate code. Any class extending `DuckBoat` can add further incorporations without writing any boilerplate of their own. What we see above is the literal implementation of `Mixin.Base`. By the way the `mixin()` method is declared on the `Mixin` interface, so here we're just providing the implementaiton, and if we forget to the compiler will complain. Also note that we made our implementation `final` so that any class which extends `DuckBoat` won't accidentally repeat our work and define needless additional copies of the state.
+
+So far we've only looked at mixins without constructors, or more correctly mixins which include a zero-param constructor. Mixins are allowed to have parameterized constructor(s). We've yet to look at how mixins are written, but for the moment know that each mixin has an inner `State` class which contains its state, and this is where constructors live. When a class wishes to incorporate a mixin with a parameter based constructor it will need to do the work to instantiate that mixin's `State` object. This is fairly straight forward, adding just one line to our former examples. 
+
+Let's assume that our `Vehicle` mixin will make its fields `final` and not have all those setter methods. It will then need a constructor which takes in those field values. `DuckBoat` would then need to be altered as follows:
+```
+class DuckBoat
+    extends Mixin.Base implements Truck, Boat
+    {    
+    public DuckBoat()
+        {
+        mixin(new Vehicle.State(/*seats*/ 24, /*storageCapacityFt3*/ 1234));
+        }
+    }
+```
+The incorporating class needs to ensure that it calls `mixin(State)` for each of its incorporated `Mixin`s that do not have a `public` zero-param constructor. Unfortunately this is not enforced at compile time, and thus failing to provide that `State` will result in an exception at runtime when the mixin is accessed. If the `State` has both a zero-param constructor and parameterized constructors, then directly instantiating and mixing in the `State` is optional as the zero-param variant will be used if no explicit `State` is provided. 
+
+
+It is highly recommended that this `State` instantiation and mixing in occur during the construction of the incorporating object, and before the object becomes visible to multiple threads. 
+
+It should be noted that it is also a runtime error to instantiate the same type of state multiple times into an incorporating object. In complex hierarchies it should be assumed that the first class in a hierarchy which incorporates such a `Mixin` would be the one to call `mixin(State)` for that `Mixin`. Any deviation from this pattern should be explicitly called out in the class documentation.
 
 That is all that you need to know in order to make use of mixins, but the question remains, how do you write a mixin?
 
@@ -138,25 +158,21 @@ interface Vehicle extends Mixin
         return mixin(State.class).seats;
         }
         
-    default void setSeats(int seats)
-        {
-        mixin(State.class).seats = seats;
-        }
-        
     default int getStorageCapacityFt3()
         {
         return mixin(State.class).storageCapacityFt3;
         }
         
-    default void setStorageCapacityFt3(int storageCapacityFt3)
-        {
-        mixin(State.class).storageCapacityFt3 = storageCapacityFt3;
-        }
-        
     final class State extends Mixin.State
         {
-        private int seats;
-        private int storageCapacityFt3;
+        private final int seats;
+        private final int storageCapacityFt3;
+        
+        public State(int seats, int storageCapacityFt3)
+            {
+            this.seaths = seats;
+            this.storageCapacityFt3 = storageCapacityFt3;
+            }
         }        
     }
 ```
@@ -175,21 +191,11 @@ interface Vehicle extneds Mixin
         return state().seats;
         }
         
-    default void setSeats(int seats)
-        {
-        state().seats = seats;
-        }
-  
     default int getStorageCapacityFt3()
         {
         return state().storageCapacityFt3;
         }
         
-    default void setStorageCapacityFt3(int storageCapacityFt3)
-        {
-        state().storageCapacityFt3 = storageCapacityFt3;
-        }
-
     private State state() // <----- helper
         {
         return mixin(State.class);
@@ -199,6 +205,12 @@ interface Vehicle extneds Mixin
         {
         private int seats;
         private int storageCapacityFt3;
+
+        public State(int seats, int storageCapacityFt3)
+            {
+            this.seaths = seats;
+            this.storageCapacityFt3 = storageCapacityFt3;
+            }
         }        
     }
 ```
@@ -259,6 +271,8 @@ interface LandVehicle extends Vehicle
 ```
 
 Note we've made `LandVehicle` extend `Vehicle` and thus inherited all of its behavior, but `LandVehicle.State` has no relationship to `Vehicle.State`. When a `DuckBoat` is instantiated it will have exactly one copy of each inner `State` object, and when `LandVechile` asks for its `State` it will receive the `LandVehicle.State` while `Vehicle`'s methods will receive `Vehicle.State`. `LandVehicle` can call the `public` methods it inherited from `Vehicle` to interact with its state as needed. If we wanted deeper integration we could put these two mixins in the same package, and make the fields package private, thus allowing `LandVehicle`'s methods to directly access `Vehicle`'s state via `mixin(Vehicle.State.class)`. 
+
+As seen above the inner `State` classes can have parameter based constructors. Ideally they would also have a `public` zero-param constructor so that the incorporating classes are not required to do manual `State` instantiation. In cases where they cannot it is important that the mixin clearly document this fact as the compiler is not able to enforce that the incorporating class has done the `State` instantiation. 
 
 That's really all there is to it. From the user's perspective using a `DuckBoat` is no different than using any other object, there is no reason for them to even be aware that it is mixin based. For the `DuckBoat` author incorporating mixins was trivial requiring at most a few lines of boilerplate, and for the mixin author, writing a mixin required a few simple transformations as compared to having written it as a `class`.
 
