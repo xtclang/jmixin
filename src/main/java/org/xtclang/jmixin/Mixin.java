@@ -331,23 +331,15 @@ public interface Mixin
                     stateAllocs.add(allocMap.get(clzState));
                     }
 
-                var iterClz = indexMap.keySet().iterator();
-                // to be captured below; capture classes in the same order as indexMap/stateAllocs
-                Class<? extends State> class0 = iterClz.hasNext() ? iterClz.next() : null;
-                Class<? extends State> class1 = iterClz.hasNext() ? iterClz.next() : null;
-                Class<? extends State> class2 = iterClz.hasNext() ? iterClz.next() : null;
-                Class<? extends State> class3 = iterClz.hasNext() ? iterClz.next() : null;
-                Class<? extends State> class4 = iterClz.hasNext() ? iterClz.next() : null;
-                Class<? extends State> class5 = iterClz.hasNext() ? iterClz.next() : null;
-                Class<? extends State> class6 = iterClz.hasNext() ? iterClz.next() : null;
-                Class<? extends State> class7 = iterClz.hasNext() ? iterClz.next() : null;
+                int cAllocs = stateAllocs.size();
+                @SuppressWarnings("unchecked")
+                Class<State>[] classes = indexMap.keySet().toArray(new Class[cAllocs]);
+                Class<? extends State> class0 = classes.length == 0 ? null : classes[0];
 
                 // create a State allocator based on the now known number of mixins for this type;
                 // if the number of mixins is small (up to 8) then we build an allocator which will
                 // find the child mixin via a linear scan; otherwise we use a full on map; for small
                 // sets the linear scan is both faster and more memory efficient than the map
-
-                int cAllocs = stateAllocs.size();
                 if (deferred)
                     {
                     return () ->
@@ -369,7 +361,15 @@ public interface Mixin
                             @SuppressWarnings("unchecked")
                             public <S extends State> S get(@NotNull Class<S> clzState)
                                 {
-                                int index = indexMap.get(clzState);
+                                int index;
+                                if (states.length <= 8)
+                                    {
+                                    for (index = 0; classes[index] != clzState; ++index);
+                                    }
+                                else
+                                    {
+                                    index = indexMap.get(clzState);
+                                    }
                                 S state = (S) STATES.getVolatile(states, index);
                                 return state == null || state == this ? ensure(index) : state;
                                 }
@@ -464,7 +464,7 @@ public interface Mixin
                         State state0 = stateAllocs.get(0).get();
                         State state1 = stateAllocs.get(1).get();
                         State state2 = stateAllocs.get(2).get();
-                        State state3 = class3 == null ? null : stateAllocs.get(3).get();
+                        State state3 = classes.length <= 3 ? null : stateAllocs.get(3).get();
                         return new State()
                             {
                             @Override
@@ -472,10 +472,10 @@ public interface Mixin
                             protected <S extends State> S get(@NotNull Class<S> clzState)
                                 {
                                 // we capture the classNs rather than using stateN.getClass() to help avoid cache misses
-                                return (S) (clzState == class0 ? state0
-                                        : clzState == class1 ? state1
-                                        : clzState == class2 ? state2
-                                        : state3);
+                                return (S) (clzState == classes[0] ? state0
+                                          : clzState == classes[1] ? state1
+                                          : clzState == classes[2] ? state2
+                                          :                          state3);
                                 }
                             };
                         };
@@ -490,9 +490,9 @@ public interface Mixin
                         State state2 = stateAllocs.get(2).get();
                         State state3 = stateAllocs.get(3).get();
                         State state4 = stateAllocs.get(4).get();
-                        State state5 = class5 == null ? null : stateAllocs.get(5).get();
-                        State state6 = class6 == null ? null : stateAllocs.get(6).get();
-                        State state7 = class7 == null ? null : stateAllocs.get(7).get();
+                        State state5 = classes.length <= 5 ? null : stateAllocs.get(5).get();
+                        State state6 = classes.length <= 6 ? null : stateAllocs.get(6).get();
+                        State state7 = classes.length <= 7 ? null : stateAllocs.get(7).get();
                         return new State()
                             {
                             @Override
@@ -500,14 +500,14 @@ public interface Mixin
                             protected <S extends State> S get(@NotNull Class<S> clzState)
                                 {
                                 // we capture the classNs rather than using stateN.getClass() to help avoid cache misses
-                                return (S) (clzState == class0 ? state0
-                                        : clzState == class1 ? state1
-                                        : clzState == class2 ? state2
-                                        : clzState == class3 ? state3
-                                        : clzState == class4 ? state4
-                                        : clzState == class5 ? state5
-                                        : clzState == class6 ? state6
-                                        : state7);
+                                return (S) (clzState == classes[0] ? state0
+                                          : clzState == classes[1] ? state1
+                                          : clzState == classes[2] ? state2
+                                          : clzState == classes[3] ? state3
+                                          : clzState == classes[4] ? state4
+                                          : clzState == classes[5] ? state5
+                                          : clzState == classes[6] ? state6
+                                          :                          state7);
                                 }
                             };
                         };
