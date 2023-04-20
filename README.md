@@ -169,7 +169,7 @@ interface Vehicle extends Mixin
         
         public State(int seats, int storageCapacityFt3)
             {
-            this.seaths = seats;
+            this.seats = seats;
             this.storageCapacityFt3 = storageCapacityFt3;
             }
         }        
