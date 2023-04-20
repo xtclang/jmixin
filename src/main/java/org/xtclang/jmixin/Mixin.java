@@ -260,17 +260,6 @@ public interface Mixin
          */
         private static final ClassValue<Supplier<State>> ALLOC = new ClassValue<>()
             {
-            private interface Deferred extends Supplier<State>
-                {
-                @Override
-                default State get()
-                    {
-                    return null;
-                    }
-
-                State ensure();
-                }
-
             @Override
             protected Supplier<State> computeValue(Class<?> clz)
                 {
@@ -303,8 +292,7 @@ public interface Mixin
 
 
                                 deferred |= ctors.length > 1;
-                                allocMap.put(clzState, ctors.length > 1
-                                 ? ((Deferred) sup::get) : sup);
+                                allocMap.put(clzState, sup);
                                 }
                             catch (NoSuchMethodException e)
                                 {
@@ -332,9 +320,48 @@ public interface Mixin
                     }
 
                 int cAllocs = stateAllocs.size();
-                @SuppressWarnings("unchecked")
-                Class<State>[] classes = indexMap.keySet().toArray(new Class[cAllocs]);
-                Class<? extends State> class0 = classes.length == 0 ? null : classes[0];
+                var iterClz = indexMap.keySet().iterator();
+
+                // Record the above state into a single object such that the State dispatching object we create
+                // below can retain just a single ref to a StateInfo helping to minimize its overall size
+                class StateInfo
+                    {
+                    // for common incorporating classes with just a handful of Mixins we can avoid array iteration by
+                    // directly accessing these class identifiers
+                    final Class<? extends State> class0 = iterClz.hasNext() ? iterClz.next() : null;
+                    final Class<? extends State> class1 = iterClz.hasNext() ? iterClz.next() : null;
+                    final Class<? extends State> class2 = iterClz.hasNext() ? iterClz.next() : null;
+                    final Class<? extends State> class3 = iterClz.hasNext() ? iterClz.next() : null;
+                    final Class<? extends State> class4 = iterClz.hasNext() ? iterClz.next() : null;
+                    final Class<? extends State> class5 = iterClz.hasNext() ? iterClz.next() : null;
+                    final Class<? extends State> class6 = iterClz.hasNext() ? iterClz.next() : null;
+
+                    final IdentityHashMap<Class<State>, Integer> indicies = indexMap;
+                    final ArrayList<Supplier<State>> allocs = stateAllocs;
+                    @SuppressWarnings("unchecked")
+                    final Class<? extends State>[] classes = indicies.keySet().toArray(new Class[cAllocs]);
+                    final int stateCount = classes.length;
+
+                    /**
+                     * Lookup the index for a given {@link State} class.
+                     *
+                     * @param clzState the class of state to lookup
+                     * @return the state's index
+                     */
+                    int index(Class<? extends State> clzState)
+                        {
+                        if (classes.length <= 8)
+                            {
+                            int index;
+                            for (index = 0; classes[index] != clzState; ++index);
+                            return index;
+                            }
+
+                        return indexMap.get(clzState);
+                        }
+                    }
+
+                StateInfo info = new StateInfo();
 
                 // create a State allocator based on the now known number of mixins for this type;
                 // if the number of mixins is small (up to 8) then we build an allocator which will
@@ -342,96 +369,73 @@ public interface Mixin
                 // sets the linear scan is both faster and more memory efficient than the map
                 if (deferred)
                     {
-                    return () ->
+                    // this is the most complex State variant, it allows for States which are explicitly constructed
+                    // by the incorporating class, and for lazily allocating States upon their first usage if they were
+                    // not explicitly allocated by the incorporating class
+                    return () ->  new State()
                         {
-                        // allocated outside of State inner class to avoid it capturing stateAllocs/cAllocs
-                        State[] states = new State[cAllocs];
-                        for (var alloc : stateAllocs)
+                        final State[] states = new State[info.stateCount];
+
+                        @Override
+                        @SuppressWarnings("unchecked")
+                        public <S extends State> S get(@NotNull Class<S> clzState)
                             {
-                            State s = alloc.get();
-                            if (s != null)
+                            int index = info.index(clzState);
+                            S state = (S) STATES.getVolatile(states, index);
+                            return state == null || state == this ? ensure(index) : state;
+                            }
+
+                        /**
+                         * Lazy allocate the state.
+                         *
+                         * @param index the state index
+                         * @return the state
+                         * @param <S> the state type
+                         */
+                        @SuppressWarnings("unchecked")
+                        private <S extends State> S ensure(int index)
+                            {
+                            Supplier<State> alloc = info.allocs.get(index);
+                            // don't allow concurrent ensures to race
+                            synchronized (this)
                                 {
-                                states[indexMap.get(s.getClass())] = s;
+                                S state = (S) STATES.getVolatile(states, index);
+                                if (state == null || state == this)
+                                    {
+                                    // prevent a concurrent mixin(State) from winning a race; we want to ensure
+                                    // that every automatic alloc is retained in case they had any side effects
+                                    state = (S) STATES.compareAndExchange(states, index, state, this);
+                                    if (state == null || state == this)
+                                        {
+                                        state = (S) alloc.get();
+                                        STATES.setVolatile(states, index, state);
+                                        }
+                                    }
+                                return state;
                                 }
                             }
 
-                        return new State()
+                        @Override
+                        void mixin(@NotNull State state)
                             {
-                            @Override
-                            @SuppressWarnings("unchecked")
-                            public <S extends State> S get(@NotNull Class<S> clzState)
+                            Integer index = info.indicies.get(state.getClass());
+                            if (index == null)
                                 {
-                                int index;
-                                if (states.length <= 8)
-                                    {
-                                    for (index = 0; classes[index] != clzState; ++index);
-                                    }
-                                else
-                                    {
-                                    index = indexMap.get(clzState);
-                                    }
-                                S state = (S) STATES.getVolatile(states, index);
-                                return state == null || state == this ? ensure(index) : state;
+                                throw new IllegalArgumentException("not a mixed in type: " + state.getClass());
                                 }
 
-                            /**
-                             * Lazy allocate the state.
-                             *
-                             * @param index the state index
-                             * @return the state
-                             * @param <S> the state type
-                             */
-                            @SuppressWarnings("unchecked")
-                            private <S extends State> S ensure(int index)
+                            // avoid sync and inflating the monitor on this common path
+                            if (!STATES.compareAndSet(states, index, null, state))
                                 {
-                                Supplier<State> alloc = stateAllocs.get(index);
-                                if (alloc instanceof Deferred)
-                                    {
-                                    // don't allow concurrent ensures to race
-                                    synchronized (this)
-                                        {
-                                        S state = (S) STATES.getVolatile(states, index);
-                                        if (state == null || state == this)
-                                            {
-                                            // prevent a concurrent mixin(State) from winning a race; we want to ensure
-                                            // that every automatic alloc is retained in case they had any side effects
-                                            state = (S) STATES.compareAndExchange(states, index, state, this);
-                                            if (state == null || state == this)
-                                                {
-                                                state = (S) ((Deferred) alloc).ensure();
-                                                STATES.setVolatile(states, index, state);
-                                                }
-                                            }
-                                        return state;
-                                        }
-                                    }
-                                // else; not able to alloc
-
-                                return null;
+                                throw new IllegalArgumentException("state already supplied: " + state.getClass());
                                 }
-
-                            @Override
-                            void mixin(@NotNull State state)
-                                {
-                                Integer index = indexMap.get(state.getClass());
-                                if (index == null)
-                                    {
-                                    throw new IllegalArgumentException("not a mixed in type: " + state.getClass());
-                                    }
-
-                                // avoid sync and inflating the monitor on this common path
-                                if (!STATES.compareAndSet(states, index, null, state))
-                                    {
-                                    throw new IllegalArgumentException("state already supplied: " + state.getClass());
-                                    }
-                                }
-                            };
+                            }
                         };
                     }
+                // for all others we don't need to be lazy and can allocate our States at the time of incorporation
                 else if (cAllocs == 0)
                     {
-                    // odd case that a class implements Mixin but doesn't incorporate any Mixins (not an error)
-                    return State::new;
+                    return null;
                     }
                 else if (cAllocs == 1)
                     {
@@ -442,9 +446,10 @@ public interface Mixin
                     {
                     return () ->
                         {
-                        // allocated outside of State inner class to avoid it capturing stateAllocs
-                        State state0 = stateAllocs.get(0).get();
-                        State state1 = stateAllocs.get(1).get();
+                        // allocated outside of State inner class to avoid it capturing info
+                        State state0 = info.allocs.get(0).get();
+                        State state1 = info.allocs.get(1).get();
+                        Class<? extends State> class0 = info.class0;
                         return new State()
                             {
                             @Override
@@ -460,22 +465,21 @@ public interface Mixin
                     {
                     return () ->
                         {
-                        // allocated outside of State inner class to avoid it capturing stateAllocs/cAllocs
-                        State state0 = stateAllocs.get(0).get();
-                        State state1 = stateAllocs.get(1).get();
-                        State state2 = stateAllocs.get(2).get();
-                        State state3 = classes.length <= 3 ? null : stateAllocs.get(3).get();
+                        State state0 = info.allocs.get(0).get();
+                        State state1 = info.allocs.get(1).get();
+                        State state2 = info.allocs.get(2).get();
+                        State state3 = info.stateCount <= 3 ? null : info.allocs.get(3).get();
                         return new State()
                             {
                             @Override
                             @SuppressWarnings("unchecked")
                             protected <S extends State> S get(@NotNull Class<S> clzState)
                                 {
-                                // we capture the classNs rather than using stateN.getClass() to help avoid cache misses
-                                return (S) (clzState == classes[0] ? state0
-                                          : clzState == classes[1] ? state1
-                                          : clzState == classes[2] ? state2
-                                          :                          state3);
+                                // only capture info, to keep the instance small
+                                return (S) (clzState == info.class0 ? state0
+                                          : clzState == info.class1 ? state1
+                                          : clzState == info.class2 ? state2
+                                          :                           state3);
                                 }
                             };
                         };
@@ -484,30 +488,29 @@ public interface Mixin
                     {
                     return () ->
                         {
-                        // allocated outside of State inner class to avoid it capturing stateAllocs/cAllocs
-                        State state0 = stateAllocs.get(0).get();
-                        State state1 = stateAllocs.get(1).get();
-                        State state2 = stateAllocs.get(2).get();
-                        State state3 = stateAllocs.get(3).get();
-                        State state4 = stateAllocs.get(4).get();
-                        State state5 = classes.length <= 5 ? null : stateAllocs.get(5).get();
-                        State state6 = classes.length <= 6 ? null : stateAllocs.get(6).get();
-                        State state7 = classes.length <= 7 ? null : stateAllocs.get(7).get();
+                        State state0 = info.allocs.get(0).get();
+                        State state1 = info.allocs.get(1).get();
+                        State state2 = info.allocs.get(2).get();
+                        State state3 = info.allocs.get(3).get();
+                        State state4 = info.allocs.get(4).get();
+                        State state5 = info.stateCount <= 5 ? null : info.allocs.get(5).get();
+                        State state6 = info.stateCount <= 6 ? null : info.allocs.get(6).get();
+                        State state7 = info.stateCount <= 7 ? null : info.allocs.get(7).get();
                         return new State()
                             {
                             @Override
                             @SuppressWarnings("unchecked")
                             protected <S extends State> S get(@NotNull Class<S> clzState)
                                 {
-                                // we capture the classNs rather than using stateN.getClass() to help avoid cache misses
-                                return (S) (clzState == classes[0] ? state0
-                                          : clzState == classes[1] ? state1
-                                          : clzState == classes[2] ? state2
-                                          : clzState == classes[3] ? state3
-                                          : clzState == classes[4] ? state4
-                                          : clzState == classes[5] ? state5
-                                          : clzState == classes[6] ? state6
-                                          :                          state7);
+                            // only capture info, to keep the instance small
+                            return (S) (clzState == info.class0 ? state0
+                                      : clzState == info.class1 ? state1
+                                      : clzState == info.class2 ? state2
+                                      : clzState == info.class3 ? state3
+                                      : clzState == info.class4 ? state4
+                                      : clzState == info.class5 ? state5
+                                      : clzState == info.class6 ? state6
+                                      :                           state7);
                                 }
                             };
                         };
@@ -520,11 +523,11 @@ public interface Mixin
                     return () ->
                         {
                         // allocated outside of State inner class to avoid it capturing stateAllocs/cAllocs
-                        State[] states = new State[cAllocs];
-                        for (var alloc : stateAllocs)
+                        State[] states = new State[info.stateCount];
+                        for (var alloc : info.allocs)
                             {
                             State s = alloc.get();
-                            states[indexMap.get(s.getClass())] = s;
+                            states[info.indicies.get(s.getClass())] = s;
                             }
 
                         return new State()
@@ -533,7 +536,7 @@ public interface Mixin
                             @SuppressWarnings("unchecked")
                             public <S extends State> S get(@NotNull Class<S> clzState)
                                 {
-                                return (S) states[indexMap.get(clzState)];
+                                return (S) states[info.indicies.get(clzState)];
                                 }
                             };
                         };

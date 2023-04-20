@@ -79,6 +79,9 @@ public class MixinTests
             }
         }
 
+    static class ExampleFixed extends Mixin.Base implements LongIdentityMixin, UuidAbleMixin
+        {
+        }
 
     @Test
     void shouldProduceId()
