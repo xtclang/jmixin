@@ -19,17 +19,17 @@ import java.util.concurrent.TimeUnit;
  *
  * <pre>
  * Benchmark                     Mode  Cnt  Score   Error  Units
- * MixinBenchmarks.testBaseline  avgt    6  1.664 ± 0.207  ns/op
- * MixinBenchmarks.testLazy      avgt    6  2.696 ± 0.468  ns/op
- * MixinBenchmarks.testMixin1    avgt    6  1.712 ± 0.150  ns/op
- * MixinBenchmarks.testMixin2    avgt    6  1.891 ± 0.081  ns/op
- * MixinBenchmarks.testMixin3    avgt    6  2.256 ± 0.120  ns/op
- * MixinBenchmarks.testMixin4    avgt    6  2.470 ± 0.318  ns/op
- * MixinBenchmarks.testMixin5    avgt    6  2.589 ± 0.067  ns/op
- * MixinBenchmarks.testMixin6    avgt    6  2.601 ± 0.372  ns/op
- * MixinBenchmarks.testMixin7    avgt    6  2.708 ± 0.008  ns/op
- * MixinBenchmarks.testMixin8    avgt    6  2.555 ± 0.104  ns/op
- * MixinBenchmarks.testMixin9    avgt    6  4.669 ± 0.074  ns/op
+ * MixinBenchmarks.testBaseline  avgt    6  1.683 ± 0.330  ns/op
+ * MixinBenchmarks.testLazy      avgt    6  2.465 ± 0.025  ns/op
+ * MixinBenchmarks.testMixin1    avgt    6  1.647 ± 0.070  ns/op
+ * MixinBenchmarks.testMixin2    avgt    6  1.896 ± 0.101  ns/op
+ * MixinBenchmarks.testMixin3    avgt    6  2.254 ± 0.104  ns/op
+ * MixinBenchmarks.testMixin4    avgt    6  2.413 ± 0.020  ns/op
+ * MixinBenchmarks.testMixin5    avgt    6  2.469 ± 0.012  ns/op
+ * MixinBenchmarks.testMixin6    avgt    6  2.535 ± 0.280  ns/op
+ * MixinBenchmarks.testMixin7    avgt    6  2.713 ± 0.015  ns/op
+ * MixinBenchmarks.testMixin8    avgt    6  2.533 ± 0.051  ns/op
+ * MixinBenchmarks.testMixin9    avgt    6  4.654 ± 0.584  ns/op
  * </pre>
  *
  * @author mf

@@ -319,7 +319,7 @@ public interface Mixin
                     stateAllocs.add(allocMap.get(clzState));
                     }
 
-                int cAllocs = stateAllocs.size();
+                int cMixins = stateAllocs.size();
                 var iterClz = indexMap.keySet().iterator();
 
                 // Record the above state into a single object such that the State dispatching object we create
@@ -328,6 +328,8 @@ public interface Mixin
                     {
                     // for common incorporating classes with just a handful of Mixins we can avoid array iteration by
                     // directly accessing these class identifiers
+                    final IdentityHashMap<Class<State>, Integer> indicies = indexMap;
+                    final int count = indicies.size();
                     final Class<? extends State> class0 = iterClz.hasNext() ? iterClz.next() : null;
                     final Class<? extends State> class1 = iterClz.hasNext() ? iterClz.next() : null;
                     final Class<? extends State> class2 = iterClz.hasNext() ? iterClz.next() : null;
@@ -335,12 +337,7 @@ public interface Mixin
                     final Class<? extends State> class4 = iterClz.hasNext() ? iterClz.next() : null;
                     final Class<? extends State> class5 = iterClz.hasNext() ? iterClz.next() : null;
                     final Class<? extends State> class6 = iterClz.hasNext() ? iterClz.next() : null;
-
-                    final IdentityHashMap<Class<State>, Integer> indicies = indexMap;
                     final ArrayList<Supplier<State>> allocs = stateAllocs;
-                    @SuppressWarnings("unchecked")
-                    final Class<? extends State>[] classes = indicies.keySet().toArray(new Class[cAllocs]);
-                    final int stateCount = classes.length;
 
                     /**
                      * Lookup the index for a given {@link State} class.
@@ -350,31 +347,33 @@ public interface Mixin
                      */
                     int index(Class<? extends State> clzState)
                         {
-                        if (classes.length <= 8)
-                            {
-                            int index;
-                            for (index = 0; classes[index] != clzState; ++index);
-                            return index;
-                            }
-
-                        return indexMap.get(clzState);
+                        return count > 8
+                                ? indexMap.get(clzState)
+                                : clzState == class0 ? 0
+                                : clzState == class1 ? 1
+                                : clzState == class2 ? 2
+                                : clzState == class3 ? 3
+                                : clzState == class4 ? 4
+                                : clzState == class5 ? 5
+                                : clzState == class6 ? 6
+                                :                      7;
                         }
                     }
 
                 StateInfo info = new StateInfo();
 
-                // create a State allocator based on the now known number of mixins for this type;
-                // if the number of mixins is small (up to 8) then we build an allocator which will
-                // find the child mixin via a linear scan; otherwise we use a full on map; for small
-                // sets the linear scan is both faster and more memory efficient than the map
+                // create a State allocator based on the now known number of mixins for this type; if the number of
+                // mixins is small (up to 8) then we build an allocator which will find the child mixin via a linear
+                // scan; otherwise we use a full on map; for small sets the linear scan is both faster and more memory
+                // efficient than the map
                 if (deferred)
                     {
                     // this is the most complex State variant, it allows for States which are explicitly constructed
                     // by the incorporating class, and for lazily allocating States upon their first usage if they were
                     // not explicitly allocated by the incorporating class
-                    return () ->  new State()
+                    return () -> new State()
                         {
-                        final State[] states = new State[info.stateCount];
+                        final State[] states = new State[info.count];
 
                         @Override
                         @SuppressWarnings("unchecked")
@@ -433,16 +432,87 @@ public interface Mixin
                         };
                     }
                 // for all others we don't need to be lazy and can allocate our States at the time of incorporation
-                else if (cAllocs == 0)
+                else if (cMixins > 8)
                     {
-                    return null;
+                    // if we have a large number of mixins we'll avoid the linear scan and instead do a map
+                    // lookup; the map is per-class rather than per-instance to save memory, each instance simply
+                    // has an array of states, and the indexes correspond to the indexMap's values
+                    return () ->
+                        {
+                        // allocated outside of State inner class to avoid it capturing stateAllocs/cAllocs
+                        State[] states = new State[info.count];
+                        for (var alloc : info.allocs)
+                            {
+                            State s = alloc.get();
+                            states[info.indicies.get(s.getClass())] = s;
+                            }
+
+                        return new State()
+                            {
+                            @Override
+                            @SuppressWarnings("unchecked")
+                            public <S extends State> S get(@NotNull Class<S> clzState)
+                                {
+                                return (S) states[info.indicies.get(clzState)];
+                                }
+                            };
+                        };
                     }
-                else if (cAllocs == 1)
+                else if (cMixins > 4)
                     {
-                    // most common case, single mixin, we can just allocate its state and not have to do any lookup
-                    return stateAllocs.get(0);
+                    return () ->
+                        {
+                        State state0 = info.allocs.get(0).get();
+                        State state1 = info.allocs.get(1).get();
+                        State state2 = info.allocs.get(2).get();
+                        State state3 = info.allocs.get(3).get();
+                        State state4 = info.allocs.get(4).get();
+                        State state5 = info.count <= 5 ? null : info.allocs.get(5).get();
+                        State state6 = info.count <= 6 ? null : info.allocs.get(6).get();
+                        State state7 = info.count <= 7 ? null : info.allocs.get(7).get();
+                        return new State()
+                            {
+                            @Override
+                            @SuppressWarnings("unchecked")
+                            protected <S extends State> S get(@NotNull Class<S> clzState)
+                                {
+                                // only capture info, to keep the instance small
+                                return (S) (clzState == info.class0 ? state0
+                                          : clzState == info.class1 ? state1
+                                          : clzState == info.class2 ? state2
+                                          : clzState == info.class3 ? state3
+                                          : clzState == info.class4 ? state4
+                                          : clzState == info.class5 ? state5
+                                          : clzState == info.class6 ? state6
+                                          :                           state7);
+                                }
+                            };
+                        };
                     }
-                else if (cAllocs == 2)
+                else if (cMixins > 2)
+                    {
+                    return () ->
+                        {
+                        State state0 = info.allocs.get(0).get();
+                        State state1 = info.allocs.get(1).get();
+                        State state2 = info.allocs.get(2).get();
+                        State state3 = info.count <= 3 ? null : info.allocs.get(3).get();
+                        return new State()
+                            {
+                            @Override
+                            @SuppressWarnings("unchecked")
+                            protected <S extends State> S get(@NotNull Class<S> clzState)
+                                {
+                                // only capture info, to keep the instance small
+                                return (S) (clzState == info.class0 ? state0
+                                          : clzState == info.class1 ? state1
+                                          : clzState == info.class2 ? state2
+                                          :                           state3);
+                                }
+                            };
+                        };
+                    }
+                else if (cMixins == 2)
                     {
                     return () ->
                         {
@@ -461,85 +531,15 @@ public interface Mixin
                             };
                         };
                     }
-                else if (cAllocs <= 4)
+                else if (cMixins == 1)
                     {
-                    return () ->
-                        {
-                        State state0 = info.allocs.get(0).get();
-                        State state1 = info.allocs.get(1).get();
-                        State state2 = info.allocs.get(2).get();
-                        State state3 = info.stateCount <= 3 ? null : info.allocs.get(3).get();
-                        return new State()
-                            {
-                            @Override
-                            @SuppressWarnings("unchecked")
-                            protected <S extends State> S get(@NotNull Class<S> clzState)
-                                {
-                                // only capture info, to keep the instance small
-                                return (S) (clzState == info.class0 ? state0
-                                          : clzState == info.class1 ? state1
-                                          : clzState == info.class2 ? state2
-                                          :                           state3);
-                                }
-                            };
-                        };
-                    }
-                else if (cAllocs <= 8)
-                    {
-                    return () ->
-                        {
-                        State state0 = info.allocs.get(0).get();
-                        State state1 = info.allocs.get(1).get();
-                        State state2 = info.allocs.get(2).get();
-                        State state3 = info.allocs.get(3).get();
-                        State state4 = info.allocs.get(4).get();
-                        State state5 = info.stateCount <= 5 ? null : info.allocs.get(5).get();
-                        State state6 = info.stateCount <= 6 ? null : info.allocs.get(6).get();
-                        State state7 = info.stateCount <= 7 ? null : info.allocs.get(7).get();
-                        return new State()
-                            {
-                            @Override
-                            @SuppressWarnings("unchecked")
-                            protected <S extends State> S get(@NotNull Class<S> clzState)
-                                {
-                            // only capture info, to keep the instance small
-                            return (S) (clzState == info.class0 ? state0
-                                      : clzState == info.class1 ? state1
-                                      : clzState == info.class2 ? state2
-                                      : clzState == info.class3 ? state3
-                                      : clzState == info.class4 ? state4
-                                      : clzState == info.class5 ? state5
-                                      : clzState == info.class6 ? state6
-                                      :                           state7);
-                                }
-                            };
-                        };
+                    // most common case, single mixin, we can just allocate its state and not have to do any lookup
+                    return stateAllocs.get(0);
                     }
                 else
                     {
-                    // if we have a large number of mixins we'll avoid the linear scan and instead do a map
-                    // lookup; the map is per-class rather than per-instance to save memory, each instance simply
-                    // has an array of states, and the indexes correspond to the indexMap's values
-                    return () ->
-                        {
-                        // allocated outside of State inner class to avoid it capturing stateAllocs/cAllocs
-                        State[] states = new State[info.stateCount];
-                        for (var alloc : info.allocs)
-                            {
-                            State s = alloc.get();
-                            states[info.indicies.get(s.getClass())] = s;
-                            }
-
-                        return new State()
-                            {
-                            @Override
-                            @SuppressWarnings("unchecked")
-                            public <S extends State> S get(@NotNull Class<S> clzState)
-                                {
-                                return (S) states[info.indicies.get(clzState)];
-                                }
-                            };
-                        };
+                    // no mixins
+                    return () -> null;
                     }
                 }
             };
