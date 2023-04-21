@@ -122,7 +122,7 @@ class DuckBoat
 ```
 That's all that is required, and now `DuckBoat` can incorporate as many mixins as it likes without needing to write any additional boilerplate code. Any class extending `DuckBoat` can add further incorporations without writing any boilerplate of their own. What we see above is the literal implementation of `Mixin.Base`. By the way the `mixin()` method is declared on the `Mixin` interface, so here we're just providing the implementaiton, and if we forget to the compiler will complain. Also note that we made our implementation `final` so that any class which extends `DuckBoat` won't accidentally repeat our work and define needless additional copies of the state.
 
-So far we've only looked at mixins without constructors, or more correctly mixins which include a zero-param constructor. Mixins are allowed to have parameterized constructor(s). We've yet to look at how mixins are written, but for the moment know that each mixin has an inner `State` class which contains its state, and this is where constructors live. When a class wishes to incorporate a mixin with a parameter based constructor it will need to do the work to instantiate that mixin's `State` object. This is fairly straight forward, adding just one line to our former examples. 
+So far we've only looked at mixins without constructors, or more correctly mixins which include a zero-param constructor. Mixins are allowed to have parameterized constructor(s). We've yet to look at how mixins are written, but for the moment know that each mixin has an inner `State` class which contains its state, and this is where constructors live. When a class wishes to incorporate a mixin with a parameterized constructor it will need to do the work to instantiate that mixin's `State` object. 
 
 Let's assume that our `Vehicle` mixin will make its fields `final` and not have all those setter methods. It will then need a constructor which takes in those field values. `DuckBoat` would then need to be altered as follows:
 ```
@@ -135,12 +135,11 @@ class DuckBoat
         }
     }
 ```
-The incorporating class needs to ensure that it calls `mixin(State)` for each of its incorporated `Mixin`s that do not have a `public` zero-param constructor. Unfortunately this is not enforced at compile time, and thus failing to provide that `State` will result in an exception at runtime when the mixin is accessed. If the `State` has both a zero-param constructor and parameterized constructors, then directly instantiating and mixing in the `State` is optional as the zero-param variant will be used if no explicit `State` is provided. 
+The incorporating class needs to ensure that it calls `mixin(State)` for any incorporated `Mixin`s lacking a `public` zero-param constructor. Unfortunately this is not enforced at compile time, and thus failing to provide that `State` will result in an exception at runtime when the mixin is accessed. If the `State` has both a zero-param constructor and parameterized constructors, then directly instantiating and mixing in the `State` is optional as the zero-param variant will be used if no explicit `State` is provided. 
 
+It is highly recommended that mixing in the `State` occur during the construction of the incorporating object, and before the object becomes visible to multiple threads. 
 
-It is highly recommended that this `State` instantiation and mixing in occur during the construction of the incorporating object, and before the object becomes visible to multiple threads. 
-
-It should be noted that it is also a runtime error to instantiate the same type of state multiple times into an incorporating object. In complex hierarchies it should be assumed that the first class in a hierarchy which incorporates such a `Mixin` would be the one to call `mixin(State)` for that `Mixin`. Any deviation from this pattern should be explicitly called out in the class documentation.
+It should be noted that it is also a runtime error to mix the same `State` type multiple times into an incorporating object. In complex hierarchies it should be assumed that the first class in a hierarchy which incorporates a `Mixin` would be the one to call `mixin(State)` for that `Mixin`. Any deviation from this pattern should be explicitly called out in the class documentation.
 
 That is all that you need to know in order to make use of mixins, but the question remains, how do you write a mixin?
 
@@ -170,7 +169,7 @@ interface Vehicle extends Mixin
         
         public State(int seats, int storageCapacityFt3)
             {
-            this.seaths = seats;
+            this.seats = seats;
             this.storageCapacityFt3 = storageCapacityFt3;
             }
         }        
