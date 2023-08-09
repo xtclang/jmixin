@@ -183,7 +183,7 @@ Note that with this pattern we mark our inner `State` class as `final`. This `fi
 When authoring more complex mixins you may choose to simplify the method implementations a bit by introducing a `private` interface helper method to your mixin:
 
 ```
-interface Vehicle extneds Mixin
+interface Vehicle extends Mixin
     {
     default int getSeats()
         {
